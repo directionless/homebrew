@@ -1,5 +1,5 @@
 FORMULA_META_FILES = %w[README README.md ChangeLog COPYING LICENSE LICENCE COPYRIGHT AUTHORS]
-PLEASE_REPORT_BUG = "#{Tty.white}Please report this bug at #{Tty.em}http://github.com/mxcl/homebrew/issues#{Tty.reset}"
+PLEASE_REPORT_BUG = "#{Tty.white}Please follow the instructions to report this bug at: #{Tty.em}\nhttps://github.com/mxcl/homebrew/wiki/new-issue#{Tty.reset}"
 
 def check_for_blacklisted_formula names
   return if ARGV.force?
@@ -18,6 +18,15 @@ def check_for_blacklisted_formula names
       Mercurial can be install thusly:
         brew install pip && pip install mercurial
     EOS
+
+    when 'npm' then abort <<-EOS.undent
+      npm can be installed thusly by following the instructions at
+        http://npmjs.org/
+
+      To do it in one line, use this command:
+        curl http://npmjs.org/install.sh | sudo sh
+    EOS
+
 
     when 'setuptools' then abort <<-EOS.undent
       When working with a Homebrew-built Python, distribute is preferred
@@ -198,8 +207,9 @@ def info f
   if f.prefix.parent.directory?
     kids=f.prefix.parent.children
     kids.each do |keg|
+      next if keg.basename.to_s == '.DS_Store'
       print "#{keg} (#{keg.abv})"
-      print " *" if f.prefix == keg and kids.length > 1
+      print " *" if f.installed_prefix == keg and kids.length > 1
       puts
     end
   else
@@ -258,7 +268,7 @@ def cleanup name
   if f.installed? and formula_cellar.directory?
     kids = f.prefix.parent.children
     kids.each do |keg|
-      next if f.prefix == keg
+      next if f.installed_prefix == keg
       print "Uninstalling #{keg}..."
       FileUtils.rm_rf keg
       puts
@@ -499,7 +509,7 @@ class PrettyListing
           else
             print_dir pn
           end
-        elsif not FORMULA_META_FILES.include? pn.basename.to_s
+        elsif not (FORMULA_META_FILES.include? pn.basename.to_s or pn.basename.to_s == '.DS_Store')
           puts pn
         end
       end
@@ -519,7 +529,7 @@ private
         puts pn
         other = 'other '
       else
-        remaining_root_files << pn 
+        remaining_root_files << pn unless pn.basename.to_s == '.DS_Store'
       end
     end
 
@@ -537,7 +547,7 @@ private
     when 0
       # noop
     when 1
-      puts *files
+      puts files
     else
       puts "#{root}/ (#{files.length} #{other}files)"
     end

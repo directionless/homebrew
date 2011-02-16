@@ -7,11 +7,18 @@ require 'formula'
 
 class Libvirt <Formula
   homepage 'http://www.libvirt.org'
-  url 'http://justinclift.fedorapeople.org/libvirt_experimental/libvirt-0.8.4-6.tar.gz'
-  md5 '88c00d745d18159e5a05a5d49a571bc7'
+  url 'http://libvirt.org/sources/libvirt-0.8.7.tar.gz'
+  sha256 'da7b0e8bff7b2df2e19d732272674599bfb805787fb0d6f30289ba700ca77f31'
 
-  depends_on "gawk"
   depends_on "gnutls"
+
+  if MACOS_VERSION < 10.6
+    # Definitely needed on Leopard, but definitely not Snow Leopard.
+    # Likely also needed on earlier OSX releases, though that hasn't
+    # been tested yet.
+    depends_on "readline"
+    depends_on "libxml2"
+  end
 
   def options
     [['--without-libvirtd', 'Build only the virsh client and development libraries.']]
