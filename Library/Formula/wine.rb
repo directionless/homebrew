@@ -27,15 +27,18 @@ class Wine < Formula
     # updating too
     #  * http://wiki.winehq.org/Gecko
     #  * http://wiki.winehq.org/Mono
-    url 'http://downloads.sourceforge.net/project/wine/Source/wine-1.5.23.tar.bz2'
-    sha1 '8c99ea994fc76bdcce95ea377a6f68e6f1c0cdf9'
+    url 'http://downloads.sourceforge.net/project/wine/Source/wine-1.5.28.tar.bz2'
+    sha1 'bc543b215dd25efc7d76c6ffa99672c6e3d15d61'
   end
 
   env :std
 
-  option :universal
+  # this tells Homebrew that dependencies must be built universal
+  def build.universal? ; true; end
 
   depends_on :x11
+  # note: we get freetype from :x11, but if the freetype formula has been installed
+  # separately and not built universal, it's going to get picked up and break the build
   depends_on 'jpeg'
   depends_on 'libicns'
   depends_on 'libtiff'
@@ -53,7 +56,7 @@ class Wine < Formula
   end
 
   # the following libraries are currently not specified as dependencies, or not built as 32-bit:
-  # configure: libsane, libv4l, libgphoto2, liblcms, gstreamer-0.10, libcapi20, libgsm, libtiff
+  # configure: libsane, libv4l, libgphoto2, gstreamer-0.10, libcapi20, libgsm
 
   # Wine loads many libraries lazily using dlopen calls, so it needs these paths
   # to be searched by dyld.
@@ -66,20 +69,14 @@ class Wine < Formula
     EOS
   end
 
-  def winemac_key; <<-EOS.undent
-    REGEDIT4
-    [HKEY_CURRENT_USER\\Software\\Wine\\Drivers]
-    "Graphics"="mac,x11"
-    "Ime"="osxime,mac,x11"
-    EOS
-  end
-
   def install
     # Build 32-bit; Wine doesn't support 64-bit host builds on OS X.
     build32 = "-arch i386 -m32"
 
     ENV["LIBS"] = "-lGL -lGLU"
     ENV.append "CFLAGS", build32
+
+    # Still miscompiles at v1.5.25
     if ENV.compiler == :clang
       opoo <<-EOS.undent
         Clang currently miscompiles some parts of Wine. If you have gcc, you
@@ -87,6 +84,7 @@ class Wine < Formula
           brew install wine --use-gcc
       EOS
     end
+
     ENV.append "CXXFLAGS", "-D_DARWIN_NO_64_BIT_INODE"
     ENV.append "LDFLAGS", "#{build32} -framework CoreServices -lz -lGL -lGLU"
 
@@ -102,15 +100,6 @@ class Wine < Formula
               --x-lib=#{MacOS::X11.lib}]
     args << "--disable-win16" if MacOS.version == :leopard or ENV.compiler == :clang
 
-    if not build.universal?
-      opoo <<-EOS.undent
-        Not building a universal wine, you will only be able to run
-        applications built for win64! To get support for win32 build with:
-          brew install wine --universal
-
-      EOS
-      args << "--enable-win64"
-    end
     # 64-bit builds of mpg123 are incompatible with 32-bit builds of Wine
     args << "--without-mpg123" if Hardware.is_64_bit?
 
@@ -130,8 +119,6 @@ class Wine < Formula
     # and name our startup script wine
     mv bin/'wine', bin/'wine.bin'
     (bin/'wine').write(wine_wrapper)
-
-    (prefix/'winemac.key').write(winemac_key) unless build.stable?
   end
 
   def caveats
@@ -153,18 +140,6 @@ class Wine < Formula
         which may cause text rendering issues in applications such as Steam.
         We recommend that you run winecfg, add an override for dwrite in the
         Libraries tab, and edit the override mode to "disable".
-      EOS
-      s += <<-EOS.undent
-
-        Starting with wine 1.5.22 the new experimental Mac driver by CodeWeavers has
-        been included in the main distribution. This allows wine to run without X11
-        on MacOS X. To enable it execute the following command in your wine prefix:
-
-          wine regedit #{prefix/'winemac.key'}
-
-        To disable it execute:
-
-          wine regedit /D 'HKEY_CURRENT_USER\\Software\\Wine\\Drivers'
       EOS
     end
     return s

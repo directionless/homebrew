@@ -1,4 +1,6 @@
 require 'extend/pathname'
+require 'formula_lock'
+require 'ostruct'
 
 class Keg < Pathname
   def initialize path
@@ -35,9 +37,9 @@ class Keg < Pathname
     # of files and directories linked
     $n=$d=0
 
-    TOP_LEVEL_DIRECTORIES.map{ |d| self/d }.each do |src|
-      next unless src.exist?
-      src.find do |src|
+    TOP_LEVEL_DIRECTORIES.map{ |d| self/d }.each do |dir|
+      next unless dir.exist?
+      dir.find do |src|
         next if src == self
         dst=HOMEBREW_PREFIX+src.relative_path_from(self)
         dst.extend ObserverPathnameExtension
@@ -62,18 +64,7 @@ class Keg < Pathname
   end
 
   def lock
-    HOMEBREW_CACHE_FORMULA.mkpath
-    path = HOMEBREW_CACHE_FORMULA/"#{fname}.brewing"
-    file = path.open(File::RDWR | File::CREAT)
-    unless file.flock(File::LOCK_EX | File::LOCK_NB)
-      raise OperationInProgressError, fname
-    end
-    yield
-  ensure
-    unless file.nil?
-      file.flock(File::LOCK_UN)
-      file.close
-    end
+    FormulaLock.new(fname).with_lock { yield }
   end
 
   def linked_keg_record
@@ -181,7 +172,8 @@ class Keg < Pathname
     from.make_relative_symlink(self)
   end
 
-protected
+  protected
+
   def resolve_any_conflicts dst
     # if it isn't a directory then a severe conflict is about to happen. Let
     # it, and the exception that is generated will message to the user about
